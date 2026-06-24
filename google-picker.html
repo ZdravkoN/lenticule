@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Add Comics</title>
+</head>
+<body>
+<!--
+  Google Picker host page for the Comic Reader app.
+
+  The app opens this page inside ASWebAuthenticationSession (the system browser, so
+  the user's Google session is available and Google permits sign-in). Parameters
+  arrive in the URL fragment (#…) so the access token is never sent to the server:
+
+    #token=<oauth access token>&apiKey=<picker api key>&appId=<project number>&redirect=<custom scheme>
+
+  On pick it redirects to  <redirect>://picked?ids=<comma-separated ids>
+  On cancel it redirects to <redirect>://cancelled
+-->
+<script>
+  function params() {
+    var p = {};
+    (location.hash || "").replace(/^#/, "").split("&").forEach(function (kv) {
+      var a = kv.split("=");
+      if (a[0]) p[a[0]] = decodeURIComponent(a[1] || "");
+    });
+    return p;
+  }
+  var P = params();
+  function goBack(suffix) { window.location.href = P.redirect + suffix; }
+
+  function onApiLoad() { gapi.load("picker", createPicker); }
+
+  function createPicker() {
+    try {
+      var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false);
+      var picker = new google.picker.PickerBuilder()
+        .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+        .setAppId(P.appId)
+        .setOAuthToken(P.token)
+        .setDeveloperKey(P.apiKey)
+        .addView(view)
+        .setCallback(pickerCallback)
+        .build();
+      picker.setVisible(true);
+    } catch (e) {
+      goBack("://cancelled");
+    }
+  }
+
+  function pickerCallback(data) {
+    var action = data[google.picker.Response.ACTION];
+    if (action == google.picker.Action.PICKED) {
+      var ids = (data[google.picker.Response.DOCUMENTS] || []).map(function (d) {
+        return d[google.picker.Document.ID];
+      });
+      goBack("://picked?ids=" + encodeURIComponent(ids.join(",")));
+    } else if (action == google.picker.Action.CANCEL) {
+      goBack("://cancelled");
+    }
+  }
+</script>
+<script src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
+</body>
+</html>
